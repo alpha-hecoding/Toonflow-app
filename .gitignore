@@ -45,4 +45,9 @@ db.sqlite-wal
 
 web/*
 
-.devtools
+# 前端编译产物（web-src 作为 git submodule）
+web-src/dist
+web-src/node_modules
+
+scripts/web
+

@@ -5,7 +5,7 @@ import { createQwen } from "qwen-ai-provider";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { createXai } from '@ai-sdk/xai';
+import { createXai } from "@ai-sdk/xai";
 
 interface Owned {
   manufacturer: string;
@@ -48,7 +48,52 @@ const modelList: Owned[] = [
   // 豆包
   {
     manufacturer: "doubao",
+    model: "doubao-seed-2-0-pro-260215",
+    responseFormat: "schema",
+    image: true,
+    think: true,
+    instance: createOpenAI,
+    tool: true,
+  },
+  {
+    manufacturer: "doubao",
+    model: "doubao-seed-2-0-lite-260215",
+    responseFormat: "schema",
+    image: true,
+    think: true,
+    instance: createOpenAI,
+    tool: true,
+  },
+  {
+    manufacturer: "doubao",
+    model: "doubao-seed-2-0-mini-260215",
+    responseFormat: "schema",
+    image: true,
+    think: true,
+    instance: createOpenAI,
+    tool: true,
+  },
+  {
+    manufacturer: "doubao",
     model: "doubao-seed-1-8-251228",
+    responseFormat: "schema",
+    image: true,
+    think: true,
+    instance: createOpenAI,
+    tool: true,
+  },
+  {
+    manufacturer: "doubao",
+    model: "deepseek-v3-2-251201",
+    responseFormat: "schema",
+    image: true,
+    think: true,
+    instance: createOpenAI,
+    tool: true,
+  },
+  {
+    manufacturer: "doubao",
+    model: "glm-4-7-251222",
     responseFormat: "schema",
     image: true,
     think: true,
@@ -413,7 +458,7 @@ const modelList: Owned[] = [
     tool: true,
   },
   //xai
-   {
+  {
     manufacturer: "xai",
     model: "grok-3",
     responseFormat: "schema",
@@ -422,7 +467,7 @@ const modelList: Owned[] = [
     instance: createXai,
     tool: true,
   },
-   {
+  {
     manufacturer: "xai",
     model: "grok-4",
     responseFormat: "schema",
@@ -431,7 +476,7 @@ const modelList: Owned[] = [
     instance: createXai,
     tool: true,
   },
-   {
+  {
     manufacturer: "xai",
     model: "grok-4.1",
     responseFormat: "schema",

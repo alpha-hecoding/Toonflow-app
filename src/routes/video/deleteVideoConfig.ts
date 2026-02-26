@@ -46,7 +46,8 @@ export default router.post(
         const userDataDir: string = app.getPath("userData");
         rootDir = path.join(userDataDir, "uploads");
       } else {
-        rootDir = path.join(process.cwd(), "uploads");
+        const uploadsDir = process.env.UPLOADS_DIR || process.cwd();
+        rootDir = path.join(uploadsDir, "uploads");
       }
       try {
         const absolutePath = path.join(rootDir, filePath);

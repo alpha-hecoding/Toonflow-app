@@ -1,54 +1,151 @@
-# 本地构建阶段 - 使用本地源码，不从 git 克隆
-FROM node:24-alpine AS builder
+# ================= 阶段 1: 前端构建阶段 =================
+FROM node:24-alpine AS frontend-builder
 
 WORKDIR /app
 
-RUN npm config set registry https://registry.npmmirror.com/ && \
-    yarn config set registry https://registry.npmmirror.com/
+# 替换 Alpine 源 + 安装构建依赖
+RUN echo "https://mirrors.aliyun.com/alpine/v3.23/community" > /etc/apk/repositories \
+    && echo "https://mirrors.aliyun.com/alpine/v3.23/main" >> /etc/apk/repositories \
+    && apk update \
+    && apk add --no-cache git
 
-# 复制依赖文件
-COPY package.json yarn.lock ./
+# 配置镜像源
+RUN yarn config set registry https://registry.npmmirror.com/ \
+    && yarn config set network-timeout 1000000
 
+# 复制前端依赖文件（先复制依赖文件以利用缓存）
+COPY web-src/package.json web-src/yarn.lock ./
+
+# 安装前端依赖
 RUN yarn install --frozen-lockfile
 
-# 复制源码
+# 复制前端源代码
+COPY web-src/ ./
+
+# 先运行一次构建来生成 auto-imports.d.ts 和 components.d.ts
+RUN yarn build-only prod
+
+# 再运行类型检查（此时类型文件已生成）
+RUN yarn type-check
+
+# 最后运行完整构建
+RUN yarn build-only prod
+
+# ================= 阶段 2: 后端构建阶段 =================
+FROM node:24-alpine AS backend-builder
+
+WORKDIR /app
+
+# 设置全局环境变量
+ENV NODE_GYP_FORCE_PYTHON=/usr/bin/python3
+
+# 替换 Alpine 源 + 安装完整构建依赖
+RUN echo "https://mirrors.aliyun.com/alpine/v3.23/community" > /etc/apk/repositories \
+    && echo "https://mirrors.aliyun.com/alpine/v3.23/main" >> /etc/apk/repositories \
+    && apk update \
+    && apk add --no-cache \
+    python3 \
+    py3-setuptools \
+    make \
+    g++ \
+    sqlite-dev \
+    pkgconfig \
+    git 
+
+# 配置镜像源
+RUN yarn config set registry https://registry.npmmirror.com/ \
+    && yarn config set network-timeout 1000000
+
+# 复制后端依赖文件（先复制依赖文件以利用缓存）
+COPY package.json yarn.lock ./
+
+# 安装后端所有依赖（包含 devDependencies，编译原生模块）
+RUN yarn install --frozen-lockfile \
+    && yarn add sqlite3 --build-from-source
+
+# 复制后端源码
 COPY tsconfig.json ./
 COPY src/ ./src/
 COPY scripts/ ./scripts/
 
+# 从前端构建阶段复制前端产物
+COPY --from=frontend-builder /app/dist ./scripts/web
+
+# 构建后端应用
 RUN yarn build
 
-# 生产阶段
-FROM node:24-alpine
+# 清理非生产依赖
+RUN yarn install --frozen-lockfile --production --ignore-scripts
+
+# ================= 阶段 3: 生产阶段 =================
+FROM node:24-alpine AS production
 
 WORKDIR /app
 
-# 安装 nginx 和 supervisor
-RUN apk add --no-cache nginx supervisor && \
-    mkdir -p /var/lib/nginx/logs /var/log/nginx && \
-    npm config set registry https://registry.npmmirror.com/ && \
-    yarn config set registry https://registry.npmmirror.com/ && \
-    npm install -g pm2
+# 生产环境仅需运行时必需品
+RUN echo "https://mirrors.aliyun.com/alpine/v3.23/community" > /etc/apk/repositories \
+    && echo "https://mirrors.aliyun.com/alpine/v3.23/main" >> /etc/apk/repositories \
+    && apk update \
+    && apk add --no-cache \
+    nginx \
+    supervisor \
+    sqlite-libs \
+    tzdata \
+    bash \
+    && mkdir -p /var/lib/nginx/logs /var/log/nginx /var/log/supervisor /var/run/supervisord /app/data \
+    && chmod -R 777 /var/log/nginx /var/lib/nginx/logs /var/log/supervisor /var/run/supervisord /app/data
 
-# 复制后端文件
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/yarn.lock ./
+# 全局安装 pm2
+RUN npm config set registry https://registry.npmmirror.com/ \
+    && npm install -g pm2
 
+# 【关键优化】直接从 backend-builder 复制编译好的产物和 node_modules
+COPY --from=backend-builder /app/build ./build
+COPY --from=backend-builder /app/node_modules ./node_modules
+COPY --from=backend-builder /app/package.json ./
 # 复制静态页面到 nginx 目录
-COPY --from=builder /app/scripts/web /usr/share/nginx/html
-
-# 只安装生产依赖
-RUN yarn install --frozen-lockfile --production
+COPY --from=backend-builder /app/scripts/web /usr/share/nginx/html
 
 # 配置 nginx
 RUN cat > /etc/nginx/http.d/default.conf << 'EOF'
 server {
     listen 80;
+    max_ranges 0;
     location / {
         root /usr/share/nginx/html;
         index index.html;
         try_files $uri $uri/ /index.html;
+    }
+    
+    # 代理上传的静态文件（图片等）到 Node.js 应用
+    location ~ ^/\d+/[^/]+/ {
+        proxy_pass http://localhost:60000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        max_ranges 0;
+    }
+    
+    # API 代理（可选）
+    location /api/ {
+        proxy_pass http://localhost:60000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+    
+    # WebSocket 代理
+    location /ws {
+        proxy_pass http://localhost:60000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
     }
 }
 EOF
@@ -57,15 +154,17 @@ EOF
 RUN sed -i 's|error_log /var/log/nginx/error.log warn;|error_log /dev/stderr warn;|g' /etc/nginx/nginx.conf || true && \
     sed -i 's|access_log /var/log/nginx/access.log main;|access_log /dev/stdout main;|g' /etc/nginx/nginx.conf || true
 
-# 配置 supervisor
+# 配置 supervisor（修复日志路径 + 权限）
 RUN cat > /etc/supervisord.conf << 'EOF'
 [supervisord]
 nodaemon=true
-logfile=/var/log/supervisord.log
-pidfile=/var/run/supervisord.pid
+logfile=/var/log/supervisor/supervisord.log
+pidfile=/var/run/supervisord/supervisord.pid
+childlogdir=/var/log/supervisor
+user=root
 
 [program:nginx]
-command=nginx -g "daemon off;"
+command=nginx -g 'daemon off;'
 autostart=true
 autorestart=true
 stdout_logfile=/dev/stdout
@@ -74,7 +173,7 @@ stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 
 [program:app]
-command=pm2-runtime start build/app.js --name app
+command=pm2-runtime build/app.js --name app
 directory=/app
 autostart=true
 autorestart=true
@@ -82,13 +181,20 @@ stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
-environment=NODE_ENV=prod
+# 明确应用端口
+environment=NODE_ENV=prod,PORT=60000,OSSURL=/
 EOF
 
+# 环境变量
 ENV NODE_ENV=prod
+# 可选：设置时区
+ENV TZ=Asia/Shanghai  
+ENV PORT=60000
+# 生产阶段无需 Python，无需配置 NODE_GYP_FORCE_PYTHON
 
+# 暴露端口（80=nginx，60000=node应用）
 EXPOSE 80
 EXPOSE 60000
 
-# 启动时创建必要目录（防止 volume 挂载覆盖）
-CMD sh -c "mkdir -p /var/log/nginx /var/lib/nginx/logs && exec supervisord -c /etc/supervisord.conf"
+# 启动命令（确保目录存在 + 执行 supervisor）
+CMD ["sh", "-c", "mkdir -p /var/log/nginx /var/lib/nginx/logs /var/log/supervisor /var/run/supervisord && exec supervisord -c /etc/supervisord.conf"]

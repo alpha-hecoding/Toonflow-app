@@ -3,8 +3,8 @@ import path from "path";
 
 // 默认环境变量（当 env 文件不存在时自动创建）
 const defaultEnvValues: Record<string, string> = {
-  dev: `NODE_ENV=dev\nPORT=60000\nOSSURL=http://127.0.0.1:60000/`,
-  prod: `NODE_ENV=prod\nPORT=60000\nOSSURL=http://127.0.0.1:60000/`,
+  dev: `NODE_ENV=dev\nPORT=60000\nOSSURL=http://127.0.0.1:60000/\nWS_PREFIX=/ws`,
+  prod: `NODE_ENV=prod\nPORT=60000\nOSSURL=http://127.0.0.1:60000/\nWS_PREFIX=/ws`,
 };
 
 // 判断是否为打包后的 Electron 环境
@@ -44,7 +44,13 @@ if (!env) {
   const text = readFileSync(envFilePath, "utf8");
   for (const line of text.split("\n")) {
     const idx = line.indexOf("=");
-    if (idx > 0) process.env[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    if (idx > 0) {
+      const key = line.slice(0, idx).trim();
+      const value = line.slice(idx + 1).trim();
+      if (!process.env[key]) {
+        process.env[key] = value;
+      }
+    }
   }
   console.log(`[环境变量] ${env}`);
 }

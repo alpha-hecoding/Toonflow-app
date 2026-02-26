@@ -24,13 +24,6 @@ interface OpenAIVideoConfig extends BaseVideoConfig {
 }
 type VideoConfig = DoubaoVideoConfig | RunninghubVideoConfig | OpenAIVideoConfig;
 
-const urlToBase64 = async (url: string): Promise<string> => {
-  const res = await axios.get(url, { responseType: "arraybuffer" });
-  const base64 = Buffer.from(res.data).toString("base64");
-  const mimeType = res.headers["content-type"] || "image/png";
-  return `data:${mimeType};base64,${base64}`;
-};
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pollTask = async (
@@ -116,7 +109,7 @@ const generateVideoWithConfig = async (config: VideoConfig, configItem: { model:
     if (isBase64) {
       imageArrPath.push(imageVal);
     } else {
-      const base64 = await urlToBase64(imageVal);
+      const base64 = await u.oss.urlToBase64(imageVal);
       imageArrPath.push(base64);
     }
   }

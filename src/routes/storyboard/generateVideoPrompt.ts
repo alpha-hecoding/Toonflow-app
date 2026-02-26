@@ -3,7 +3,6 @@ import u from "@/utils";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { z } from "zod";
-import axios from "axios";
 
 const router = express.Router();
 
@@ -97,13 +96,6 @@ const prompt = `
 现在请根据我提供的分镜内容，严格按照以上规则输出 Motion Prompt JSON 对象。
 
 `;
-async function urlToBase64(imageUrl: string): Promise<string> {
-  const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
-  const contentType = response.headers["content-type"] || "image/png";
-  const base64 = Buffer.from(response.data, "binary").toString("base64");
-  return `data:${contentType};base64,${base64}`;
-}
-// 生成单个分镜提示
 async function generateSingleVideoPrompt({
   scriptText,
   storyboardPrompt,
@@ -127,7 +119,7 @@ async function generateSingleVideoPrompt({
         },
         {
           type: "image",
-          image: await urlToBase64(ossPath),
+          image: await u.oss.urlToBase64(ossPath),
         },
       ],
     },

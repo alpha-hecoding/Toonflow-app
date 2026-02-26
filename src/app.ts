@@ -30,7 +30,8 @@ export default async function startServe() {
     const userDataDir: string = app.getPath("userData");
     rootDir = path.join(userDataDir, "uploads");
   } else {
-    rootDir = path.join(process.cwd(), "uploads");
+    const uploadsDir = process.env.UPLOADS_DIR || process.cwd();
+    rootDir = path.join(uploadsDir, "uploads");
   }
 
   // 确保 uploads 目录存在
@@ -39,7 +40,7 @@ export default async function startServe() {
   }
   console.log("文件目录:", rootDir);
 
-  app.use(express.static(rootDir));
+  app.use(express.static(rootDir, { acceptRanges: false }));
 
   app.use(async (req, res, next) => {
     const setting = await u.db("t_setting").where("id", 1).select("tokenKey").first();

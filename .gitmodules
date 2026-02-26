@@ -1,0 +1,4 @@
+[submodule "web-src"]
+	path = web-src
+	url = https://github.com/alpha-hecoding/Toonflow-web.git
+	branch = my

@@ -8,7 +8,6 @@ expressWs(router as unknown as Application);
 router.ws("/", async (ws, req) => {
   let agent: OutlineScript;
 
-
   const projectId = req.query.projectId;
   if (!projectId || typeof projectId !== "string") {
     ws.send(JSON.stringify({ type: "error", data: "项目ID缺失" }));
@@ -16,7 +15,17 @@ router.ws("/", async (ws, req) => {
     return;
   }
 
-  agent = new OutlineScript(Number(projectId));
+  console.log("[WebSocket] outline/agentsOutline 连接, projectId:", projectId);
+
+  try {
+    agent = new OutlineScript(Number(projectId));
+    console.log("[WebSocket] OutlineScript 创建成功");
+  } catch (error) {
+    console.error("[WebSocket] OutlineScript 创建失败:", error);
+    ws.send(JSON.stringify({ type: "error", data: "Agent初始化失败: " + (error as Error).message }));
+    ws.close(500, "Agent初始化失败");
+    return;
+  }
 
   // const existing = await u
   //   .db("t_chatHistory")
@@ -72,6 +81,7 @@ router.ws("/", async (ws, req) => {
   });
 
   // 发送初始化完成消息，通知前端可以开始发送消息
+  console.log("[WebSocket] 发送 init 消息, projectId:", projectId);
   ws.send(JSON.stringify({ type: "init", data: { projectId } }));
 
   type DataTyype = "msg" | "setNovel" | "cleanHistory";

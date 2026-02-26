@@ -4,17 +4,8 @@ import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { z } from "zod";
 import { v4 } from "uuid";
-import axios from "axios";
 
 const router = express.Router();
-
-// url转base64
-async function urlToBase64(imageUrl: string): Promise<string> {
-  const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
-  const contentType = response.headers["content-type"] || "image/png";
-  const base64 = Buffer.from(response.data, "binary").toString("base64");
-  return `data:${contentType};base64,${base64}`;
-}
 
 // 超分并保存到 oss
 async function superResolutionAndSave(src: string, projectId: number, videoRatio: string): Promise<{ ossPath: string; base64: string }> {
@@ -26,7 +17,7 @@ async function superResolutionAndSave(src: string, projectId: number, videoRatio
       resType: "b64",
       systemPrompt: "你的核心任务是将所给的图片超分到 1K ，不改变图片任何内容，仅改变分辨率",
       prompt: "你的核心任务是将所给的图片超分到 1K ，不改变图片任何内容，仅改变分辨率",
-      imageBase64: [await urlToBase64(src)],
+      imageBase64: [await u.oss.urlToBase64(src)],
     },
     apiConfig,
   );

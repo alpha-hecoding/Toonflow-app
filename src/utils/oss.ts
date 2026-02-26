@@ -1,6 +1,7 @@
 import isPathInside from "is-path-inside";
 import fs from "node:fs/promises";
 import path from "node:path";
+import axios from "axios";
 import u from "@/utils";
 
 // 规范化路径：去除前导斜杠，并将路径分隔符统一转换为系统分隔符
@@ -32,7 +33,8 @@ class OSS {
       const userDataDir: string = app.getPath("userData");
       this.rootDir = path.join(userDataDir, "uploads");
     } else {
-      this.rootDir = path.join(process.cwd(), "uploads");
+      const uploadsDir = process.env.UPLOADS_DIR || process.cwd();
+      this.rootDir = path.join(uploadsDir, "uploads");
     }
     // 初始化时自动创建根目录
     this.initPromise = fs.mkdir(this.rootDir, { recursive: true }).then(() => {});
@@ -55,7 +57,7 @@ class OSS {
     await this.ensureInit();
     const safePath = normalizeUserPath(userRelPath);
     // URL 始终使用 /，所以这里需要将系统分隔符转回 /
-    const url = process.env.OSSURL || `http://127.0.0.1:60000/`;
+    const url = process.env.OSSURL || `/`;
     return `${url}${safePath.split(path.sep).join("/")}`;
   }
 
@@ -150,6 +152,30 @@ class OSS {
     const absPath = resolveSafeLocalPath(userRelPath, this.rootDir);
     await fs.mkdir(path.dirname(absPath), { recursive: true });
     await fs.writeFile(absPath, data);
+  }
+
+  /**
+   * 将 URL 转换为 base64 编码的 Data URL。
+   * 支持相对路径（会自动补全为完整 URL）和绝对 URL。
+   * @param imageUrl 图片 URL（可以是相对路径或绝对 URL）
+   * @returns base64 编码的 Data URL (例如: data:image/png;base64,iVBORw0KGgo...)
+   */
+  async urlToBase64(imageUrl: string): Promise<string> {
+    // 如果是相对路径，转换为完整 URL
+    let fullUrl = imageUrl;
+    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+      const baseUrl = process.env.OSSURL || '/';
+      if (baseUrl === '/' || !baseUrl.startsWith('http://')) {
+        fullUrl = `http://localhost:${process.env.PORT || 60000}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+      } else {
+        fullUrl = `${baseUrl.replace(/\/$/, '')}${imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl}`;
+      }
+    }
+
+    const response = await axios.get(fullUrl, { responseType: "arraybuffer" });
+    const contentType = response.headers["content-type"] || "image/png";
+    const base64 = Buffer.from(response.data, "binary").toString("base64");
+    return `data:${contentType};base64,${base64}`;
   }
 
   /**

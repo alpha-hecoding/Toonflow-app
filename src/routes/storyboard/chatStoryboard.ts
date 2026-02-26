@@ -8,7 +8,6 @@ expressWs(router as unknown as Application);
 router.ws("/", async (ws, req) => {
   let agent: Storyboard;
 
-
   const projectId = req.query.projectId;
   const scriptId = req.query.scriptId;
   if (!projectId || typeof projectId !== "string" || !scriptId || typeof scriptId !== "string") {
@@ -17,7 +16,17 @@ router.ws("/", async (ws, req) => {
     return;
   }
 
-  agent = new Storyboard(Number(projectId), Number(scriptId));
+  console.log("[WebSocket] storyboard/chatStoryboard 连接, projectId:", projectId, "scriptId:", scriptId);
+
+  try {
+    agent = new Storyboard(Number(projectId), Number(scriptId));
+    console.log("[WebSocket] Storyboard 创建成功");
+  } catch (error) {
+    console.error("[WebSocket] Storyboard 创建失败:", error);
+    ws.send(JSON.stringify({ type: "error", data: "Agent初始化失败: " + (error as Error).message }));
+    ws.close(500, "Agent初始化失败");
+    return;
+  }
 
   const existing = await u
     .db("t_chatHistory")
@@ -103,6 +112,7 @@ router.ws("/", async (ws, req) => {
   });
 
   // 发送初始化完成消息，通知前端可以开始发送消息
+  console.log("[WebSocket] 发送 init 消息, projectId:", projectId, "scriptId:", scriptId);
   ws.send(JSON.stringify({ type: "init", data: { projectId, scriptId } }));
 
   type DataTyype = "msg" | "cleanHistory" | "generateShotImage" | "replaceShot";

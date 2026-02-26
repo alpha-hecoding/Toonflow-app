@@ -19,7 +19,7 @@ export default router.post(
       .db("t_videoConfig")
       .leftJoin("t_config", "t_config.id", "t_videoConfig.aiConfigId")
       .where({ scriptId })
-      .orderBy("createTime", "desc")
+      .orderBy("t_videoConfig.createTime", "asc")
       .select("t_videoConfig.*", "t_config.manufacturer as manufacturer", "t_config.model");
     // 解析 JSON 字段
     const result = configs.map((config: any) => ({
