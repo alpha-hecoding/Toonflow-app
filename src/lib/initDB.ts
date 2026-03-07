@@ -638,7 +638,7 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
         await knex("t_imageModel").insert([
           { manufacturer: "volcengine", model: "doubao-seedream-5-0-260128", grid: 1, type: "ti2i" },
           { manufacturer: "volcengine", model: "doubao-seedream-4-5-251128", grid: 0, type: "ti2i" },
-          // { manufacturer: "volcengine", model: "doubao-seedream-4-0-250828", grid: 0, type: "ti2i" },
+          { manufacturer: "volcengine", model: "doubao-seedream-4-0-250828", grid: 0, type: "ti2i" },
           { manufacturer: "kling", model: "kling-image-o1", grid: 0, type: "ti2i" },
           { manufacturer: "gemini", model: "gemini-2.5-flash-image", grid: 1, type: "ti2i" },
           { manufacturer: "gemini", model: "gemini-3-pro-image-preview", grid: 1, type: "ti2i" },
