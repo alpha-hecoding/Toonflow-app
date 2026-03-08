@@ -1,4 +1,4 @@
-// @db-hash 0f9789bd5ad2eebd79bd502988efcb4e
+// @db-hash efae0216e055c10fbb48aaf4c8d50cb9
 //该文件由脚本自动生成，请勿手动修改
 
 export interface t_aiModelMap {
@@ -169,6 +169,7 @@ export interface t_videoConfig {
   'scriptId'?: number | null;
   'selectedResultId'?: number | null;
   'startFrame'?: string | null;
+  'storyboardId'?: number | null;
   'updateTime'?: number | null;
 }
 export interface t_videoModel {
